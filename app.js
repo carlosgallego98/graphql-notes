@@ -1,61 +1,21 @@
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 const express = require('express');
 const bodyParser = require('body-parser');
-const { graphqlHTTP } = require('express-graphql');
-const { buildSchema } = require('graphql');
+const {graphqlHTTP} = require('express-graphql');
+
+const expressPlayground = require('graphql-playground-middleware-express').default
+const sechema = require('./sechemas/schema')
 
 const app = express();
 app.use(bodyParser.json());
 
-var notes = [];
+app.use('/graphql', graphqlHTTP({
+    schema: sechema,
+}))
 
-const schema = buildSchema(`
-    type Category{
-        name: String!
-    }
+app.use('/playground', expressPlayground({ endpoint: '/graphql' }))
 
-    type Note{
-        title: String!
-        body: String!
-        category: Category!
-    }
-
-    type Queries{
-        notes: [Note!]!
-    }
-
-    type Mutations{
-        addNote(title: String!,body: String!): [Note]
-    }
-
-    schema {
-        query: Queries
-        mutation: Mutations
-    }
-`);
-
-const resolvers = {
-    notes: () =>{
-        return notes;
-    },
-    addNote: (args) =>{
-        notes.push(
-            {
-                title:args.title,
-                body:args.body,
-            }
-            );
-        return notes;
-    }
-}
-
-app.use('/graphql',graphqlHTTP({
-    schema: schema,
-    rootValue: resolvers,
-    graphiql: true
-}))  
-
-app.listen(PORT,()=>{
+app.listen(PORT, () => {
     console.log(`Servidor de Express corriendo en: http://localhost:${PORT}/graphql`);
-})
+});
