@@ -25,6 +25,7 @@
   "devDependencies": {
     "bcryptjs": "^2.4.3",
     "jsonwebtoken": "^8.5.1",
-    "nodemon": "^2.0.4"
+    "nodemon": "^2.0.4",
+    "slugify": "^1.4.5"
   }
 }

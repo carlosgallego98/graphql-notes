@@ -20,7 +20,7 @@ module.exports = (req, res, next) =>{
         return next();
     }
 
-    req.authHeader = true;
+    req.authUser = true;
     req.userId = userToken.userId
     next()
     
