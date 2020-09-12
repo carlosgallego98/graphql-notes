@@ -6,7 +6,7 @@ const { GraphQLObjectType,
         GraphQLNonNull,
         GraphQLSchema} = graphql;
 const bcrypt = require('bcryptjs');
-
+const jwt = require('jsonwebtoken');
 const { User, Note } = require("../models/index");
 
 // Types
@@ -62,15 +62,14 @@ const AuthType = new GraphQLObjectType({
     })
 })
 
-// Query
+// Queries
 const RootQuery = new GraphQLObjectType({
     name: "RootQueryType",
     fields: {
         notes: {
             type: new GraphQLList(NoteType),
-            args: { userId: {type: GraphQLID}},
-            resolve(parent,args){
-                return User.findOne({where: {id:args.userId},include: "Notes"})
+            resolve(parent,args,req){ 
+                return User.findOne({where: {id:req.userId},include: "Notes"})
                 .then(results=>{
                     return results.Notes;
                 });
@@ -88,17 +87,22 @@ const RootQuery = new GraphQLObjectType({
             args: {username: {type: GraphQLString},password: {type: GraphQLString} },
             resolve(parent,args){
                 return User.findOne({where: {username: args.username}})
-                .then(result =>{
-                    if (result){
-                        return {
-                            userId: result.id,
-                            token: "WIP",
-                            expires: "WIP"
-                        };
-                    }else{
-                        throw new Error("Credenciales incorrectas"); 
-                    }
-                })
+                            .then(result =>{
+                                if (result){
+                                    let token = jwt.sign({
+                                        userId: result.id,
+                                        username: result.username
+                                    },"HolaMundoSoyPro",{expiresIn: "1h"});
+
+                                    return { 
+                                        userId: result.id,
+                                        token: token,
+                                        expires: "1h"
+                                    }
+                                }else{
+                                    throw new Error("Credenciales incorrectas"); 
+                                }
+                            })
             }
         }
     }
@@ -120,6 +124,23 @@ const RootMutation = new GraphQLObjectType({
                 })
             }
         },
+        createNote: {
+            type: NoteType,
+            args: {
+                title: {type: new GraphQLNonNull(GraphQLString)},
+                body: {type: new GraphQLNonNull(GraphQLString)},
+            },
+            resolve(parent,args,req){
+                let slug = args.title;
+                return Note.create({
+                    title: args.title,
+                    body: args.body,
+                    userId: req.userId,
+                    slug: slug.replace(" ","-",).toLowerCase()
+                })
+            }
+        }
+
     }
 })
 

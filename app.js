@@ -6,9 +6,11 @@ const {graphqlHTTP} = require('express-graphql');
 
 const expressPlayground = require('graphql-playground-middleware-express').default
 const sechema = require('./sechemas/schema')
-
+const AuthMiddleware = require("./middleware/auth")
 const app = express();
 app.use(bodyParser.json());
+
+app.use(AuthMiddleware)
 
 app.use('/graphql', graphqlHTTP({
     schema: sechema,
