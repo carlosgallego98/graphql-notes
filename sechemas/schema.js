@@ -4,7 +4,8 @@ const { GraphQLObjectType,
         GraphQLID,
         GraphQLList,
         GraphQLNonNull,
-        GraphQLSchema} = graphql;
+        GraphQLSchema
+} = graphql;
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User, Note } = require("../models/index");
@@ -46,7 +47,7 @@ const UserType = new GraphQLObjectType({
         username: { type: GraphQLString },
         password: { type: GraphQLString },
         notes:{
-            type: new GraphQLList(NoteType),
+            type: GraphQLList(NoteType),
             resolve(parent,args){
                 return Note.findAll( { where: { userId : parent.id } } );
             }
@@ -68,7 +69,7 @@ const RootQuery = new GraphQLObjectType({
     name: "RootQueryType",
     fields: {
         notes: {
-            type: new GraphQLList(NoteType),
+            type: GraphQLList(NoteType),
             resolve(parent,args,req){
                 if(!req.authUser){
                     throw new Error("Autenticación necesaria")
@@ -94,21 +95,29 @@ const RootQuery = new GraphQLObjectType({
             type: AuthType,
             args: {username: {type: GraphQLString},password: {type: GraphQLString} },
             resolve(parent,args,req){
-                return User.findOne({where: {username: args.username}})
-                            .then(result =>{
-                                if (result){
-                                    let token = jwt.sign({
-                                        userId: result.id,
-                                        username: result.username
-                                    },"HolaMundoSoyPro",{expiresIn: "4h"});
+                console.log(args)
+                return User.findOne({where: {username: args.username}}).then(user =>{
+                                if (user){
+                                    return bcrypt.compare(args.password,user.password).then( ( res ) => {
+                                        console.log(res)
+                                        if(res){
+                                            let token = jwt.sign({
+                                                userId: user.id,
+                                                username: user.username,
+                                            },"HolaMundoSoyPro",{expiresIn: "4h"});
 
-                                    return { 
-                                        userId: result.id,
-                                        token: token,
-                                        expires: "4h"
-                                    }
+                                            return {
+                                                userId: user.id,
+                                                token: token,
+                                                created: new Date().toISOString(),
+                                                expires: "4h"
+                                            }
+                                        }else{
+                                            throw new Error("Credenciales incorrectas");
+                                        }
+                                    })
                                 }else{
-                                    throw new Error("Credenciales incorrectas"); 
+                                    throw new Error("Credenciales incorrectas");
                                 }
                             })
             }
@@ -122,9 +131,9 @@ const RootMutation = new GraphQLObjectType({
         registerUser: {
             type: UserType,
             args : {
-                name: {type: new GraphQLNonNull(GraphQLString)},
-                username: {type: new GraphQLNonNull(GraphQLString)},
-                password: {type: new GraphQLNonNull(GraphQLString)}
+                name: {type: GraphQLNonNull(GraphQLString)},
+                username: {type: GraphQLNonNull(GraphQLString)},
+                password: {type: GraphQLNonNull(GraphQLString)}
             },
             resolve(parent,args,req){
                 if(req.authUser){
@@ -138,8 +147,8 @@ const RootMutation = new GraphQLObjectType({
         createNote: {
             type: NoteType,
             args: {
-                title: {type: new GraphQLNonNull(GraphQLString)},
-                body: {type: new GraphQLNonNull(GraphQLString)},
+                title: {type: GraphQLNonNull(GraphQLString)},
+                body: {type: GraphQLNonNull(GraphQLString)},
             },
             resolve(parent,args,req){
                 if(!req.authUser){
