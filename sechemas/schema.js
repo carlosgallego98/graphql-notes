@@ -6,6 +6,12 @@ const { GraphQLObjectType,
         GraphQLNonNull,
         GraphQLSchema
 } = graphql;
+const {
+    GraphQLDate,
+    GraphQLTime,
+    GraphQLDateTime
+} = require('graphql-iso-date');
+
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { User, Note } = require("../models/index");
@@ -20,8 +26,8 @@ const NoteType = new GraphQLObjectType({
         body: { type: GraphQLString },
         slug: { type: GraphQLString },
         userId: { type: GraphQLID },
-        createdAt: { type: GraphQLString },
-        updatedAt: { type: GraphQLString },
+        createdAt: { type: GraphQLDateTime },
+        updatedAt: { type: GraphQLDateTime },
         creator: {
             type: UserType,
             resolve(parent,args){
@@ -46,6 +52,8 @@ const UserType = new GraphQLObjectType({
         name: { type: GraphQLString },
         username: { type: GraphQLString },
         password: { type: GraphQLString },
+        createdAt: { type: GraphQLDateTime },
+        updatedAt: { type: GraphQLDateTime },
         notes:{
             type: GraphQLList(NoteType),
             resolve(parent,args){
@@ -71,10 +79,10 @@ const RootQuery = new GraphQLObjectType({
         notes: {
             type: GraphQLList(NoteType),
             resolve(parent,args,req){
-                if(!req.authUser){
+                if(!req.userToken.userId){
                     throw new Error("Autenticación necesaria")
                 }
-                return User.findOne({where: {id:req.userId},include: "Notes"})
+                return User.findOne({where: {id:req.userToken.userId},include: "Notes"})
                 .then(results=>{
                     return results.Notes;
                 });
@@ -82,20 +90,17 @@ const RootQuery = new GraphQLObjectType({
         },
         user:{
             type: UserType,
-            args: { id: { type: GraphQLID } },
             resolve(parent,args,req){
-                if(!req.authUser){
+                if(!req.userToken.userId){
                     throw new Error("Autenticación necesaria")
                 }
-                if(args.id) return User.findOne({where:{id:args.id}});
-                return User.findOne({where:{id:req.userId}});
+                return User.findOne({where:{id:req.userToken.userId}});
             }
         },
         login: {
             type: AuthType,
             args: {username: {type: GraphQLString},password: {type: GraphQLString} },
             resolve(parent,args,req){
-                console.log(args)
                 return User.findOne({where: {username: args.username}}).then(user =>{
                                 if (user){
                                     return bcrypt.compare(args.password,user.password).then( ( res ) => {
@@ -104,13 +109,12 @@ const RootQuery = new GraphQLObjectType({
                                             let token = jwt.sign({
                                                 userId: user.id,
                                                 username: user.username,
-                                            },"HolaMundoSoyPro",{expiresIn: "4h"});
+                                            },"HolaMundoSoyPro");
 
                                             return {
                                                 userId: user.id,
                                                 token: token,
                                                 created: new Date().toISOString(),
-                                                expires: "4h"
                                             }
                                         }else{
                                             throw new Error("Credenciales incorrectas");
@@ -136,8 +140,8 @@ const RootMutation = new GraphQLObjectType({
                 password: {type: GraphQLNonNull(GraphQLString)}
             },
             resolve(parent,args,req){
-                if(req.authUser){
-                    throw new Error("Ya estás registrado")
+                if(!req.userToken.userId){
+                    throw new Error("Ya estas registrado")
                 }
                 return bcrypt.hash(args.password,10).then(hashedPassword =>{
                     return User.create({ name: args.name, username: args.username, password: hashedPassword })
@@ -151,13 +155,13 @@ const RootMutation = new GraphQLObjectType({
                 body: {type: GraphQLNonNull(GraphQLString)},
             },
             resolve(parent,args,req){
-                if(!req.authUser){
-                    throw new Error("Antenticación Necesaria")
+                if(!req.userToken.userId){
+                    throw new Error("Autenticación necesaria")
                 }
                 return Note.create({
                     title: args.title,
                     body: args.body,
-                    userId: req.userId,
+                    userId: req.userToken.userId,
                     slug: slugify(args.title).toLowerCase()
                 })
             }
@@ -168,8 +172,8 @@ const RootMutation = new GraphQLObjectType({
                 noteId: {type: new GraphQLNonNull(GraphQLID)},
             },
             resolve(parent,args,req){
-                if(!req.authUser){
-                    throw new Error("Antenticación Necesaria")
+                if(!req.userToken.userId){
+                    throw new Error("Autenticación necesaria")
                 }
                 Note.destroy({
                     where:{id:args.noteId}
